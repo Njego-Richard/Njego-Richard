@@ -21,6 +21,7 @@ function App() {
       setX(response.data)
     },[])*/
 
+    // this is the javascript http client method
    axios.get('http://localhost:3002/users/a').then((response) => {
 
       setX(response.data)
