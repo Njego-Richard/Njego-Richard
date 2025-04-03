@@ -836,3 +836,153 @@ public async Task<bool> AreDependenciesSatisfied(int requestId, int stepId)
 
 
 
+
+private bool CheckParameterCondition(ApprovalCondition condition)
+{
+    if (string.IsNullOrEmpty(condition.Parameter))
+        return true; // No parameter condition to check
+    
+    // Get the related approval request
+    var request = _context.RequestApprovals
+        .Include(a => a.Request)
+        .FirstOrDefault(a => a.Id == condition.RequiredApprovalId)?.Request;
+    
+    if (request == null) return false;
+
+    // Simple example: Check amount conditions
+    if (condition.Parameter.StartsWith("Amount>"))
+    {
+        if (decimal.TryParse(condition.Parameter.Substring(7), out decimal minAmount))
+        {
+            // Assuming request has an Amount property
+            return request.Amount > minAmount; 
+        }
+    }
+    else if (condition.Parameter.StartsWith("Amount<"))
+    {
+        if (decimal.TryParse(condition.Parameter.Substring(7), out decimal maxAmount))
+        {
+            return request.Amount < maxAmount;
+        }
+    }
+    
+    // Add more parameter checks as needed
+    return false; // Default to false if condition isn't met
+}
+
+
+
+private bool CheckParameterCondition(ApprovalCondition condition)
+{
+    if (string.IsNullOrEmpty(condition.Parameter))
+        return true;
+
+    var request = _context.RequestApprovals
+        .Include(a => a.Request)
+        .FirstOrDefault(a => a.Id == condition.RequiredApprovalId)?.Request;
+    
+    if (request == null) return false;
+
+    try
+    {
+        // Using a simple rule parser
+        return EvaluateCondition(condition.Parameter, request);
+    }
+    catch
+    {
+        return false;
+    }
+}
+
+private bool EvaluateCondition(string condition, ApprovalRequest request)
+{
+    // Example condition format: "Amount > 5000 && Department == 'Finance'"
+    // This would require a proper expression evaluator
+    
+    // Simple implementation for demonstration:
+    var parts = condition.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+    
+    if (parts.Length == 3) // Simple ternary conditions
+    {
+        string property = parts[0];
+        string op = parts[1];
+        string value = parts[2].Trim('\'','"');
+        
+        switch (property)
+        {
+            case "Amount":
+                decimal amountValue = decimal.Parse(value);
+                decimal requestAmount = request.Amount;
+                return op switch
+                {
+                    ">" => requestAmount > amountValue,
+                    "<" => requestAmount < amountValue,
+                    ">=" => requestAmount >= amountValue,
+                    "<=" => requestAmount <= amountValue,
+                    "==" => requestAmount == amountValue,
+                    _ => false
+                };
+                
+            case "Department":
+                return op switch
+                {
+                    "==" => request.Department == value,
+                    "!=" => request.Department != value,
+                    _ => false
+                };
+                
+            // Add more property checks as needed
+        }
+    }
+    
+    return false;
+}
+
+// Using NRules or similar
+private readonly IRulesEngine _rulesEngine;
+
+public bool CheckParameterCondition(ApprovalCondition condition)
+{
+    if (string.IsNullOrEmpty(condition.Parameter))
+        return true;
+
+    var request = _context.RequestApprovals
+        .Include(a => a.Request)
+        .FirstOrDefault(a => a.Id == condition.RequiredApprovalId)?.Request;
+    
+    if (request == null) return false;
+
+    // Compile the condition into a rule
+    var rule = CompileRule(condition.Parameter);
+    return _rulesEngine.Evaluate(rule, request);
+}
+
+
+public class ApprovalWorkflowService : IApprovalWorkflowService
+{
+    private readonly ApprovalWorkflowContext _context;
+    
+    // ... other methods ...
+    
+    private bool CheckParameterCondition(ApprovalCondition condition)
+    {
+        // Implementation here
+    }
+    
+    public async Task<bool> IsStepReadyForApprovalAsync(int requestId, int stepId)
+    {
+        // Uses CheckParameterCondition internally
+        var conditions = await _context.ApprovalConditions
+            .Where(c => c.Dependency.ChildStepId == stepId)
+            .ToListAsync();
+            
+        foreach (var condition in conditions)
+        {
+            if (!CheckParameterCondition(condition))
+                return false;
+        }
+        
+        return true;
+    }
+}
+
