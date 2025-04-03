@@ -586,3 +586,253 @@ var dependency = new ApprovalDependency
     ConditionType = ConditionType.Specific,
     Conditions = new List<ApprovalCondition> { condition1, condition2, condition3 }
 };
+
+public enum ConditionType
+{
+    All,        // All parent steps must be approved
+    Any,        // Any one parent step must be approved
+    Specific    // Custom conditions must be met
+}
+
+public class ApprovalDependency
+{
+    public int Id { get; set; }
+    
+    public int ParentStepId { get; set; }
+    public ApprovalStep ParentStep { get; set; }
+    
+    public int ChildStepId { get; set; }
+    public ApprovalStep ChildStep { get; set; }
+    
+    public ConditionType ConditionType { get; set; }
+    
+    public ICollection<ApprovalCondition> Conditions { get; set; }
+}
+
+public class ApprovalCondition
+{
+    public int Id { get; set; }
+    
+    public int DependencyId { get; set; }
+    public ApprovalDependency Dependency { get; set; }
+    
+    public int RequiredApprovalId { get; set; }
+    public RequestApproval RequiredApproval { get; set; }
+    
+    public ApprovalStatus RequiredStatus { get; set; } = ApprovalStatus.Approved;
+    
+    public string Parameter { get; set; } // For custom conditions
+}
+
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    // Configure the self-referencing dependency relationship
+    modelBuilder.Entity<ApprovalDependency>()
+        .HasOne(d => d.ParentStep)
+        .WithMany(s => s.ChildDependencies)
+        .HasForeignKey(d => d.ParentStepId)
+        .OnDelete(DeleteBehavior.Restrict);
+        
+    modelBuilder.Entity<ApprovalDependency>()
+        .HasOne(d => d.ChildStep)
+        .WithMany(s => s.ParentDependencies)
+        .HasForeignKey(d => d.ChildStepId)
+        .OnDelete(DeleteBehavior.Restrict);
+        
+    // Prevent circular dependencies
+    modelBuilder.Entity<ApprovalDependency>()
+        .HasCheckConstraint("CK_Dependency_NoSelfReference", "ParentStepId <> ChildStepId");
+        
+    // Configure conditions
+    modelBuilder.Entity<ApprovalCondition>()
+        .HasOne(c => c.Dependency)
+        .WithMany(d => d.Conditions)
+        .HasForeignKey(c => c.DependencyId);
+}
+
+
+public class DependencyService
+{
+    private readonly ApprovalWorkflowContext _context;
+
+    public DependencyService(ApprovalWorkflowContext context)
+    {
+        _context = context;
+    }
+
+    // Create a basic dependency
+    public async Task<ApprovalDependency> CreateDependencyAsync(
+        int parentStepId, 
+        int childStepId, 
+        ConditionType conditionType)
+    {
+        var dependency = new ApprovalDependency
+        {
+            ParentStepId = parentStepId,
+            ChildStepId = childStepId,
+            ConditionType = conditionType
+        };
+
+        _context.ApprovalDependencies.Add(dependency);
+        await _context.SaveChangesAsync();
+        return dependency;
+    }
+
+    // Add a specific condition to a dependency
+    public async Task<ApprovalCondition> AddConditionAsync(
+        int dependencyId,
+        int requiredApprovalId,
+        ApprovalStatus requiredStatus = ApprovalStatus.Approved,
+        string parameter = null)
+    {
+        var condition = new ApprovalCondition
+        {
+            DependencyId = dependencyId,
+            RequiredApprovalId = requiredApprovalId,
+            RequiredStatus = requiredStatus,
+            Parameter = parameter
+        };
+
+        _context.ApprovalConditions.Add(condition);
+        await _context.SaveChangesAsync();
+        return condition;
+    }
+
+    // Create a complete workflow structure
+    public async Task CreateWorkflowStructureAsync(string workflowType)
+    {
+        // Example: Create a three-step workflow with dependencies
+        var steps = new[]
+        {
+            new ApprovalStep { WorkflowType = workflowType, StepName = "Initial Review", StepOrder = 1 },
+            new ApprovalStep { WorkflowType = workflowType, StepName = "Department Approval", StepOrder = 2 },
+            new ApprovalStep { WorkflowType = workflowType, StepName = "Final Sign-off", StepOrder = 3 }
+        };
+
+        await _context.ApprovalSteps.AddRangeAsync(steps);
+        await _context.SaveChangesAsync();
+
+        // Create dependencies between them
+        await CreateDependencyAsync(steps[0].Id, steps[1].Id, ConditionType.All);
+        await CreateDependencyAsync(steps[1].Id, steps[2].Id, ConditionType.All);
+    }
+}
+
+var service = new DependencyService(context);
+
+// Create steps
+var step1 = new ApprovalStep { WorkflowType = "purchase", StepName = "Manager", StepOrder = 1 };
+var step2 = new ApprovalStep { WorkflowType = "purchase", StepName = "Director", StepOrder = 2 };
+
+await context.ApprovalSteps.AddRangeAsync(step1, step2);
+await context.SaveChangesAsync();
+
+// Create dependency
+await service.CreateDependencyAsync(step1.Id, step2.Id, ConditionType.All);
+
+
+
+// Create steps
+var steps = new[]
+{
+    new ApprovalStep { WorkflowType = "contract", StepName = "Legal", StepOrder = 1 },
+    new ApprovalStep { WorkflowType = "contract", StepName = "Finance", StepOrder = 2 },
+    new ApprovalStep { WorkflowType = "contract", StepName = "Execution", StepOrder = 3 }
+};
+
+await context.ApprovalSteps.AddRangeAsync(steps);
+await context.SaveChangesAsync();
+
+// Create dependency with specific conditions
+var dependency = await service.CreateDependencyAsync(
+    parentStepId: steps[1].Id, 
+    childStepId: steps[2].Id, 
+    conditionType: ConditionType.Specific);
+
+// Add specific conditions
+await service.AddConditionAsync(dependency.Id, financeApprovalId, ApprovalStatus.Approved);
+await service.AddConditionAsync(dependency.Id, vpOverrideId, ApprovalStatus.Approved, "Amount>10000");
+
+// Create steps
+var steps = new[]
+{
+    new ApprovalStep { WorkflowType = "contract", StepName = "Legal", StepOrder = 1 },
+    new ApprovalStep { WorkflowType = "contract", StepName = "Finance", StepOrder = 2 },
+    new ApprovalStep { WorkflowType = "contract", StepName = "Execution", StepOrder = 3 }
+};
+
+await context.ApprovalSteps.AddRangeAsync(steps);
+await context.SaveChangesAsync();
+
+// Create dependency with specific conditions
+var dependency = await service.CreateDependencyAsync(
+    parentStepId: steps[1].Id, 
+    childStepId: steps[2].Id, 
+    conditionType: ConditionType.Specific);
+
+// Add specific conditions
+await service.AddConditionAsync(dependency.Id, financeApprovalId, ApprovalStatus.Approved);
+await service.AddConditionAsync(dependency.Id, vpOverrideId, ApprovalStatus.Approved, "Amount>10000");
+
+
+// Create parallel approval steps
+var parallelSteps = new[]
+{
+    new ApprovalStep { WorkflowType = "hr", StepName = "HR Review", StepOrder = 2, IsParallel = true },
+    new ApprovalStep { WorkflowType = "hr", StepName = "Compliance", StepOrder = 2, IsParallel = true }
+};
+
+await context.ApprovalSteps.AddRangeAsync(parallelSteps);
+await context.SaveChangesAsync();
+
+// Both parallel steps depend on initial approval
+var initialStep = await context.ApprovalSteps
+    .FirstAsync(s => s.WorkflowType == "hr" && s.StepOrder == 1);
+
+await service.CreateDependencyAsync(initialStep.Id, parallelSteps[0].Id, ConditionType.Any);
+await service.CreateDependencyAsync(initialStep.Id, parallelSteps[1].Id, ConditionType.Any);
+
+
+public async Task<bool> AreDependenciesSatisfied(int requestId, int stepId)
+{
+    var dependencies = await _context.ApprovalDependencies
+        .Include(d => d.Conditions)
+        .Where(d => d.ChildStepId == stepId)
+        .ToListAsync();
+
+    foreach (var dependency in dependencies)
+    {
+        switch (dependency.ConditionType)
+        {
+            case ConditionType.All:
+                var parentApprovals = await _context.RequestApprovals
+                    .Where(a => a.RequestId == requestId && 
+                               a.StepId == dependency.ParentStepId)
+                    .ToListAsync();
+                
+                if (parentApprovals.Any(a => a.Status != ApprovalStatus.Approved))
+                    return false;
+                break;
+
+            case ConditionType.Any:
+                var anyApproved = await _context.RequestApprovals
+                    .AnyAsync(a => a.RequestId == requestId && 
+                                  a.StepId == dependency.ParentStepId && 
+                                  a.Status == ApprovalStatus.Approved);
+                if (!anyApproved) return false;
+                break;
+
+            case ConditionType.Specific:
+                var unmetConditions = await _context.ApprovalConditions
+                    .Where(c => c.DependencyId == dependency.Id)
+                    .AnyAsync(c => c.RequiredApproval.Status != c.RequiredStatus ||
+                                 !CheckParameterCondition(c.Parameter));
+                if (unmetConditions) return false;
+                break;
+        }
+    }
+    return true;
+}
+
+
+
