@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requests with Rich Text Comments</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Quill Rich Text Editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <style>
+        .accordion-button:not(.collapsed) {
+            background-color: #f8f9fa;
+        }
+        .accordion-button:focus {
+            box-shadow: none;
+            border-color: rgba(0,0,0,.125);
+        }
+        .status-badge {
+            font-size: 0.9rem;
+        }
+        .requester-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .comment-card {
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 1rem;
+        }
+        .requester-comment {
+            border-left-color: #198754;
+        }
+        .approver-comment {
+            border-left-color: #0dcaf0;
+        }
+        .comments-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+        }
+        .comment-form {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #dee2e6;
+        }
+        .ql-toolbar {
+            border-radius: 0.25rem 0.25rem 0 0 !important;
+        }
+        .ql-container {
+            border-radius: 0 0 0.25rem 0.25rem !important;
+            height: 150px;
+            margin-bottom: 1rem;
+        }
+        .rich-comment-content {
+            line-height: 1.6;
+        }
+        .rich-comment-content p {
+            margin-bottom: 1rem;
+        }
+        .rich-comment-content ul, 
+        .rich-comment-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+        .rich-comment-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.25rem;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4">Requests Dashboard</h1>
+        
+        <!-- Search and Filter Bar -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Search requests...">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select">
+                            <option selected>All Statuses</option>
+                            <option>Pending</option>
+                            <option>Approved</option>
+                            <option>Declined</option>
+                            <option>Draft</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select">
+                            <option selected>All Types</option>
+                            <option>Purchase</option>
+                            <option>Travel</option>
+                            <option>Leave</option>
+                            <option>Expense</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Requests Accordion -->
+        <div class="accordion" id="requestsAccordion">
+            <!-- Request Item 1 -->
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#request1">
+                        <div class="d-flex justify-content-between w-100 pe-3">
+                            <div>
+                                <span class="fw-bold me-3">#REQ-2023-001</span>
+                                <span>New Marketing Materials</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-success status-badge me-2">Approved</span>
+                                <span class="requester-info">John Doe • Oct 15, 2023</span>
+                            </div>
+                        </div>
+                    </button>
+                </h2>
+                <div id="request1" class="accordion-collapse collapse" data-bs-parent="#requestsAccordion">
+                    <div class="accordion-body">
+                        <!-- Request Details -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Requester:</strong> John Doe</p>
+                                <p><strong>Department:</strong> Marketing</p>
+                                <p><strong>Date Submitted:</strong> October 15, 2023</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Approver:</strong> Jane Smith</p>
+                                <p><strong>Status:</strong> Approved</p>
+                                <p><strong>Date Approved:</strong> October 18, 2023</p>
+                            </div>
+                        </div>
+                        <hr>
+                        <h5>Request Details</h5>
+                        <p><strong>Title:</strong> New Marketing Materials</p>
+                        <p><strong>Description:</strong> Request for approval to purchase new marketing materials for the upcoming campaign.</p>
+                        <p><strong>Budget:</strong> $2,500.00</p>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-end mt-3">
+                            <button class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="collapse" data-bs-target="#commentsRequest1">
+                                <i class="bi bi-chat"></i> Comments (3)
+                            </button>
+                            <button class="btn btn-sm btn-success me-2">
+                                <i class="bi bi-check"></i> Approve
+                            </button>
+                            <button class="btn btn-sm btn-danger">
+                                <i class="bi bi-x"></i> Decline
+                            </button>
+                        </div>
+                        
+                        <!-- Comments Section (initially hidden) -->
+                        <div id="commentsRequest1" class="collapse mt-3">
+                            <div class="comments-container">
+                                <!-- Comment 1 (Rich Text Example) -->
+                                <div class="card comment-card approver-comment">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <div>
+                                                <strong>Jane Smith</strong> (Approver)
+                                                <span class="text-muted ms-2"><small>October 16, 2023 - 10:30 AM</small></span>
+                                            </div>
+                                            <div>
+                                                <span class="badge bg-info">Approver</span>
+                                            </div>
+                                        </div>
+                                        <div class="rich-comment-content">
+                                            <p>Can you please provide more details about the promotional items? Specifically:</p>
+                                            <ul>
+                                                <li>What specific products are you considering?</li>
+                                                <li>What quantities of each?</li>
+                                                <li>Any branding specifications?</li>
+                                            </ul>
+                                            <p>Also, please confirm if you've reviewed these options with the design team.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Comment 2 (Rich Text Example) -->
+                                <div class="card comment-card requester-comment">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <div>
+                                                <strong>John Doe</strong> (Requester)
+                                                <span class="text-muted ms-2"><small>October 16, 2023 - 2:15 PM</small></span>
+                                            </div>
+                                            <div>
+                                                <span class="badge bg-success">Requester</span>
+                                            </div>
+                                        </div>
+                                        <div class="rich-comment-content">
+                                            <p>Here are the details you requested:</p>
+                                            <p><strong>Products:</strong></p>
+                                            <ol>
+                                                <li>Branded USB drives (500 units)</li>
+                                                <li>Custom notebooks (300 units)</li>
+                                            </ol>
+                                            <p><strong>Branding:</strong> Will include our logo and tagline "Innovate Everyday"</p>
+                                            <p>The design team has approved these specs (see attached).</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Comment 3 (Rich Text Example) -->
+                                <div class="card comment-card approver-comment">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <div>
+                                                <strong>Jane Smith</strong> (Approver)
+                                                <span class="text-muted ms-2"><small>October 17, 2023 - 9:00 AM</small></span>
+                                            </div>
+                                            <div>
+                                                <span class="badge bg-info">Approver</span>
+                                            </div>
+                                        </div>
+                                        <div class="rich-comment-content">
+                                            <p>Thank you for the comprehensive details. I've reviewed the specifications and everything looks good.</p>
+                                            <p>The <strong>10% discount</strong> for ordering before month-end makes this a particularly good deal.</p>
+                                            <div class="alert alert-success mt-2 mb-0">
+                                                <i class="bi bi-check-circle-fill"></i> <strong>Approval Note:</strong> Request approved with budget of $2,500.00
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Rich Text Comment Form -->
+                            <div class="comment-form">
+                                <h6>Add New Comment</h6>
+                                <form id="commentForm1">
+                                    <!-- Quill Editor Container -->
+                                    <div id="editor1"></div>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <div>
+                                            <input type="file" class="form-control form-control-sm" id="fileUpload1">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-sm">Post Comment</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true">Previous</a>
+                </li>
+                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                <li class="page-item">
+                    <a class="page-link" href="#">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Quill JS -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script>
+        // Initialize Quill editors
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Quill editor for each comment form
+            const quill1 = new Quill('#editor1', {
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline', 'strike'],
+                        ['blockquote', 'code-block'],
+                        [{ 'header': 1 }, { 'header': 2 }],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        [{ 'script': 'sub'}, { 'script': 'super' }],
+                        [{ 'indent': '-1'}, { 'indent': '+1' }],
+                        [{ 'direction': 'rtl' }],
+                        [{ 'size': ['small', false, 'large', 'huge'] }],
+                        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                        [{ 'color': [] }, { 'background': [] }],
+                        [{ 'font': [] }],
+                        [{ 'align': [] }],
+                        ['clean'],
+                        ['link', 'image']
+                    ]
+                },
+                placeholder: 'Write your comment here...',
+                theme: 'snow'
+            });
+            
+            // Form submission handler
+            document.getElementById('commentForm1').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const commentContent = quill1.root.innerHTML;
+                
+                // Here you would typically send the content to your server
+                console.log('Comment submitted:', commentContent);
+                
+                // For demo purposes, just show an alert
+                alert('Comment submitted! (Check console for HTML content)');
+                
+                // Clear the editor
+                quill1.root.innerHTML = '';
+            });
+            
+            // Optional: Keep comments open when clicking inside
+            document.querySelectorAll('.comments-container, .comment-form').forEach(element => {
+                element.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
