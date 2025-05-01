@@ -327,3 +327,503 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Requests List</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Quill Rich Text Editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <style>
+        .accordion-button:not(.collapsed) {
+            background-color: #f8f9fa;
+        }
+        .accordion-button:focus {
+            box-shadow: none;
+            border-color: rgba(0,0,0,.125);
+        }
+        .status-badge {
+            font-size: 0.9rem;
+        }
+        .requester-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .comment-card {
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 1rem;
+        }
+        .requester-comment {
+            border-left-color: #198754;
+        }
+        .approver-comment {
+            border-left-color: #0dcaf0;
+        }
+        .comments-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+        }
+        .comment-form {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #dee2e6;
+        }
+        .ql-toolbar {
+            border-radius: 0.25rem 0.25rem 0 0 !important;
+        }
+        .ql-container {
+            border-radius: 0 0 0.25rem 0.25rem !important;
+            height: 150px;
+            margin-bottom: 1rem;
+        }
+        .rich-comment-content {
+            line-height: 1.6;
+        }
+        .rich-comment-content p {
+            margin-bottom: 1rem;
+        }
+        .rich-comment-content ul, 
+        .rich-comment-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+        .rich-comment-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.25rem;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4">Requests Dashboard</h1>
+        
+        <!-- Search and Filter Bar -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Search requests..." id="searchInput">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="statusFilter">
+                            <option value="all" selected>All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="declined">Declined</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="typeFilter">
+                            <option value="all" selected>All Types</option>
+                            <option value="purchase">Purchase</option>
+                            <option value="travel">Travel</option>
+                            <option value="leave">Leave</option>
+                            <option value="expense">Expense</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Requests Accordion -->
+        <div class="accordion" id="requestsAccordion">
+            <!-- Requests will be dynamically inserted here -->
+        </div>
+        
+        <!-- Pagination -->
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center" id="pagination">
+                <!-- Pagination will be dynamically inserted here -->
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Request Item Template (hidden) -->
+    <template id="requestTemplate">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#request{id}">
+                    <div class="d-flex justify-content-between w-100 pe-3">
+                        <div>
+                            <span class="fw-bold me-3">#{requestId}</span>
+                            <span>{title}</span>
+                        </div>
+                        <div>
+                            <span class="badge {statusClass} status-badge me-2">{status}</span>
+                            <span class="requester-info">{requester} • {date}</span>
+                        </div>
+                    </div>
+                </button>
+            </h2>
+            <div id="request{id}" class="accordion-collapse collapse" data-bs-parent="#requestsAccordion">
+                <div class="accordion-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Requester:</strong> {requester}</p>
+                            <p><strong>Department:</strong> {department}</p>
+                            <p><strong>Date Submitted:</strong> {date}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Approver:</strong> {approver}</p>
+                            <p><strong>Status:</strong> {status}</p>
+                            <p><strong>{statusDateLabel}:</strong> {statusDate}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <h5>Request Details</h5>
+                    <p><strong>Title:</strong> {title}</p>
+                    <p><strong>Description:</strong> {description}</p>
+                    <p><strong>Budget:</strong> {budget}</p>
+                    <p><strong>Attachments:</strong> 
+                        <a href="#" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-file-pdf"></i> Quote.pdf</a>
+                        <a href="#" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-file-word"></i> Specifications.docx</a>
+                    </p>
+                    
+                    <div class="d-flex justify-content-end mt-3">
+                        <button class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="collapse" data-bs-target="#comments{id}">
+                            <i class="bi bi-chat"></i> Comments (<span class="comment-count">{commentCount}</span>)
+                        </button>
+                        <button class="btn btn-sm btn-success me-2 {approveBtnClass}">
+                            <i class="bi bi-check"></i> Approve
+                        </button>
+                        <button class="btn btn-sm btn-danger {declineBtnClass}">
+                            <i class="bi bi-x"></i> Decline
+                        </button>
+                    </div>
+                    
+                    <div id="comments{id}" class="collapse mt-3">
+                        <div class="comments-container" id="commentsContainer{id}">
+                            <!-- Comments will be inserted here -->
+                        </div>
+                        
+                        <div class="comment-form">
+                            <h6>Add New Comment</h6>
+                            <form id="commentForm{id}">
+                                <div id="editor{id}"></div>
+                                <div class="d-flex justify-content-between mt-2">
+                                    <div>
+                                        <input type="file" class="form-control form-control-sm" id="fileUpload{id}">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm">Post Comment</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Comment Template (hidden) -->
+    <template id="commentTemplate">
+        <div class="card comment-card {commentClass}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <div>
+                        <strong>{author}</strong> ({role})
+                        <span class="text-muted ms-2"><small>{date}</small></span>
+                    </div>
+                    <div>
+                        <span class="badge {roleBadgeClass}">{role}</span>
+                    </div>
+                </div>
+                <div class="rich-comment-content">{content}</div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Quill JS -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script>
+        // Sample data - in a real app, this would come from an API
+        const requests = [
+            {
+                id: 1,
+                requestId: "REQ-2023-001",
+                title: "New Marketing Materials",
+                requester: "John Doe",
+                department: "Marketing",
+                date: "October 15, 2023",
+                approver: "Jane Smith",
+                status: "Approved",
+                statusDate: "October 18, 2023",
+                statusDateLabel: "Date Approved",
+                description: "Request for approval to purchase new marketing materials for the upcoming campaign.",
+                budget: "$2,500.00",
+                type: "purchase",
+                comments: [
+                    {
+                        author: "Jane Smith",
+                        role: "Approver",
+                        date: "October 16, 2023 - 10:30 AM",
+                        content: `<p>Can you please provide more details about the promotional items? Specifically:</p>
+                                 <ul>
+                                    <li>What specific products are you considering?</li>
+                                    <li>What quantities of each?</li>
+                                    <li>Any branding specifications?</li>
+                                 </ul>
+                                 <p>Also, please confirm if you've reviewed these options with the design team.</p>`
+                    },
+                    {
+                        author: "John Doe",
+                        role: "Requester",
+                        date: "October 16, 2023 - 2:15 PM",
+                        content: `<p>Here are the details you requested:</p>
+                                 <p><strong>Products:</strong></p>
+                                 <ol>
+                                    <li>Branded USB drives (500 units)</li>
+                                    <li>Custom notebooks (300 units)</li>
+                                 </ol>
+                                 <p><strong>Branding:</strong> Will include our logo and tagline "Innovate Everyday"</p>
+                                 <p>The design team has approved these specs (see attached).</p>`
+                    },
+                    {
+                        author: "Jane Smith",
+                        role: "Approver",
+                        date: "October 17, 2023 - 9:00 AM",
+                        content: `<p>Thank you for the comprehensive details. I've reviewed the specifications and everything looks good.</p>
+                                 <p>The <strong>10% discount</strong> for ordering before month-end makes this a particularly good deal.</p>
+                                 <div class="alert alert-success mt-2 mb-0">
+                                    <i class="bi bi-check-circle-fill"></i> <strong>Approval Note:</strong> Request approved with budget of $2,500.00
+                                 </div>`
+                    }
+                ]
+            },
+            {
+                id: 2,
+                requestId: "REQ-2023-002",
+                title: "Team Building Event",
+                requester: "Sarah Johnson",
+                department: "HR",
+                date: "October 20, 2023",
+                approver: "Michael Brown",
+                status: "Pending",
+                statusDate: "October 27, 2023",
+                statusDateLabel: "Due Date",
+                description: "Quarterly team building activity at the local adventure park.",
+                budget: "$1,800.00",
+                type: "expense",
+                comments: [
+                    {
+                        author: "Michael Brown",
+                        role: "Approver",
+                        date: "October 21, 2023 - 3:45 PM",
+                        content: `<p>Have you considered alternative venues that might be more cost-effective? The current budget seems high compared to last quarter's event.</p>
+                                 <p>Please provide a cost comparison with at least two other options.</p>`
+                    }
+                ]
+            },
+            {
+                id: 3,
+                requestId: "REQ-2023-003",
+                title: "Conference Travel",
+                requester: "Robert Chen",
+                department: "Engineering",
+                date: "October 18, 2023",
+                approver: "Lisa Wong",
+                status: "Declined",
+                statusDate: "October 19, 2023",
+                statusDateLabel: "Date Declined",
+                description: "Attend DevConf 2023 in San Francisco (travel, accommodation, and conference fees).",
+                budget: "$3,750.00",
+                type: "travel",
+                comments: [
+                    {
+                        author: "Lisa Wong",
+                        role: "Approver",
+                        date: "October 19, 2023 - 11:20 AM",
+                        content: `<p>While I appreciate the initiative, we need to limit travel expenses this quarter due to budget constraints.</p>
+                                 <p>I suggest attending the virtual conference option which costs only $299.</p>
+                                 <div class="alert alert-danger mt-2 mb-0">
+                                    <i class="bi bi-x-circle-fill"></i> <strong>Decline Note:</strong> Request declined due to budget constraints
+                                 </div>`
+                    }
+                ]
+            }
+        ];
+
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            renderRequests(requests);
+            setupFilters();
+        });
+
+        // Render all requests
+        function renderRequests(requestsToRender) {
+            const accordion = document.getElementById('requestsAccordion');
+            accordion.innerHTML = '';
+            
+            requestsToRender.forEach(request => {
+                // Clone the template
+                const template = document.getElementById('requestTemplate');
+                const clone = template.content.cloneNode(true);
+                const html = clone.firstElementChild.outerHTML;
+                
+                // Replace placeholders with actual data
+                let requestHtml = html
+                    .replace(/{id}/g, request.id)
+                    .replace(/{requestId}/g, request.requestId)
+                    .replace(/{title}/g, request.title)
+                    .replace(/{requester}/g, request.requester)
+                    .replace(/{department}/g, request.department)
+                    .replace(/{date}/g, request.date)
+                    .replace(/{approver}/g, request.approver)
+                    .replace(/{status}/g, request.status)
+                    .replace(/{statusDate}/g, request.statusDate)
+                    .replace(/{statusDateLabel}/g, request.statusDateLabel)
+                    .replace(/{description}/g, request.description)
+                    .replace(/{budget}/g, request.budget)
+                    .replace(/{commentCount}/g, request.comments.length);
+                
+                // Set status-specific classes
+                if (request.status === 'Approved') {
+                    requestHtml = requestHtml
+                        .replace(/{statusClass}/g, 'bg-success')
+                        .replace(/{approveBtnClass}/g, 'disabled')
+                        .replace(/{declineBtnClass}/g, 'disabled');
+                } else if (request.status === 'Declined') {
+                    requestHtml = requestHtml
+                        .replace(/{statusClass}/g, 'bg-danger')
+                        .replace(/{approveBtnClass}/g, 'disabled')
+                        .replace(/{declineBtnClass}/g, 'disabled');
+                } else {
+                    requestHtml = requestHtml
+                        .replace(/{statusClass}/g, 'bg-warning text-dark')
+                        .replace(/{approveBtnClass}/g, '')
+                        .replace(/{declineBtnClass}/g, '');
+                }
+                
+                // Insert the request HTML
+                accordion.insertAdjacentHTML('beforeend', requestHtml);
+                
+                // Render comments for this request
+                renderComments(request.id, request.comments);
+                
+                // Initialize Quill editor for this request
+                initQuillEditor(request.id);
+            });
+        }
+
+        // Render comments for a specific request
+        function renderComments(requestId, comments) {
+            const container = document.getElementById(`commentsContainer${requestId}`);
+            const template = document.getElementById('commentTemplate');
+            
+            comments.forEach(comment => {
+                const clone = template.content.cloneNode(true);
+                const html = clone.firstElementChild.outerHTML;
+                
+                // Determine comment styling based on role
+                const roleClass = comment.role === 'Requester' ? 'requester-comment' : 'approver-comment';
+                const roleBadgeClass = comment.role === 'Requester' ? 'bg-success' : 'bg-info';
+                
+                let commentHtml = html
+                    .replace(/{commentClass}/g, roleClass)
+                    .replace(/{author}/g, comment.author)
+                    .replace(/{role}/g, comment.role)
+                    .replace(/{date}/g, comment.date)
+                    .replace(/{content}/g, comment.content)
+                    .replace(/{roleBadgeClass}/g, roleBadgeClass);
+                
+                container.insertAdjacentHTML('beforeend', commentHtml);
+            });
+        }
+
+        // Initialize Quill editor for a request
+        function initQuillEditor(requestId) {
+            const quill = new Quill(`#editor${requestId}`, {
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline', 'strike'],
+                        ['blockquote', 'code-block'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['link']
+                    ]
+                },
+                placeholder: 'Write your comment here...',
+                theme: 'snow'
+            });
+            
+            // Handle form submission
+            document.getElementById(`commentForm${requestId}`).addEventListener('submit', function(e) {
+                e.preventDefault();
+                const content = quill.root.innerHTML;
+                
+                // In a real app, you would send this to your server
+                console.log(`New comment for request ${requestId}:`, content);
+                alert('Comment submitted! (Check console for content)');
+                
+                // Clear the editor
+                quill.root.innerHTML = '';
+            });
+        }
+
+        // Setup filter functionality
+        function setupFilters() {
+            const searchInput = document.getElementById('searchInput');
+            const statusFilter = document.getElementById('statusFilter');
+            const typeFilter = document.getElementById('typeFilter');
+            
+            // Add event listeners
+            searchInput.addEventListener('input', filterRequests);
+            statusFilter.addEventListener('change', filterRequests);
+            typeFilter.addEventListener('change', filterRequests);
+        }
+
+        // Filter requests based on search and filters
+        function filterRequests() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            
+            const filteredRequests = requests.filter(request => {
+                // Search term matching
+                const matchesSearch = 
+                    request.requestId.toLowerCase().includes(searchTerm) ||
+                    request.title.toLowerCase().includes(searchTerm) ||
+                    request.requester.toLowerCase().includes(searchTerm) ||
+                    request.description.toLowerCase().includes(searchTerm);
+                
+                // Status filter matching
+                const matchesStatus = 
+                    statusFilter === 'all' || 
+                    request.status.toLowerCase() === statusFilter;
+                
+                // Type filter matching
+                const matchesType = 
+                    typeFilter === 'all' || 
+                    request.type.toLowerCase() === typeFilter;
+                
+                return matchesSearch && matchesStatus && matchesType;
+            });
+            
+            renderRequests(filteredRequests);
+        }
+    </script>
+</body>
+</html>
